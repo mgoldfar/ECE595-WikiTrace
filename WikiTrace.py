@@ -1,7 +1,6 @@
 import os, sys
 import memcache
 
-
 class DBTraceStats:
 	def __init__(self):
 		self.reads = 0
@@ -98,25 +97,33 @@ class TraceItem:
 
 		self.items = []
 		self.parent = parent
+
+	def clone(self, shallow=False):
+		"""Creates a duplicate of this node an all children."""
+		new_item = TraceItem(self.description, None)
+		new_item.time = self.time
+		new_item.memchange_in = self.memchange_in
+		new_item.memchange_out = self.memchange_out
+		new_item.level = self.level
 		
+		if not shallow:
+			for ch in self.items:
+				new_ch = ch.clone()
+				new_item.add_item(new_ch)
+				new_ch.parent = new_item
+		else:
+			new_item.items.extend(self.items)
+		return new_item
+			
 	def add_item(self, item):
 		item.level = self.level + 1
 		self.items.append(item)
 	
 	def get_time(self, prefixes=None):
 		t = 0.0
-		if not prefixes:
-			t = self.time	
-			for n in self.items:
-				t += n.get_time(prefixes)
-		else:
-			nodes = self.get_nodes(prefixes)
-			for n in nodes:
-				if n != self:
-					t += n.get_time()
-				else:
-					t += n.time
-						
+		nodes = self.get_nodes(prefixes)
+		for n in nodes:
+			t += n.time				
 		return t
 			
 	def get_cache_stats(self, prefixes=None):
@@ -164,9 +171,10 @@ class TraceItem:
 		"""Gets the nodes that contain the specified prefixes"""
 	
 		if not prefixes:
-			return [self]
+			return self.items
 		
 		nodes = []
+		
 		if any(( self.description.startswith(p) for p in prefixes )):
 			return [self]
 		else:
@@ -175,11 +183,40 @@ class TraceItem:
 				nodes.extend(ch.get_nodes(prefixes))
 			return nodes
 			
+	def remove_subtrees(self, nodes):
+		"""Removes the subtrees rooted by the elements of nodes. This creates a duplicate trace item."""
+				
+		# leaf node
+		if len(self.items) == 0:
+			if self not in nodes:
+				return self.clone()
+			else:
+				return None
+		
+		new_children = []
+		subtracted_time = 0.0
+		for ch in self.items:
+			if ch not in nodes:
+				new_subtree = ch.remove_subtrees(nodes)
+				if new_subtree:
+					new_children.append(new_subtree)
+			else:
+				subtracted_time += ch.time
+		
+		new_root = self.clone(True) # shallow copy
+		new_root.items = new_children # repace children
+		new_root.time = 0.0 
+		for ch in new_root.items: 
+			new_root.time += ch.time # reompute node time
+			ch.parent = new_root # update parent node
+			
+		return new_root
+		
 	def get_nodes_containing(self, substrs=None):
 		"""Gets a list of any nodes that contain a substrings"""
 		
 		if not substrs:
-			return [self]
+			return self.items
 		
 		if  any(( self.description.find(p) >= 0 for p in substrs )):
 			return [self]
@@ -194,24 +231,27 @@ class TraceItem:
 	
 	def toString(self, maxdepth=0, depth=0):
 		"""Reproduces the oroginal trace string."""
+		pad = ""
+		for i in range(depth):
+			pad += " "
 		if len(self.items) > 0:
 			
 			# special parent object:
 			if self.parent == None:
-				s = "%f %f < %s\n" % (self.time, self.memchange_in, self.description)
+				s = "%-20s %s< %s\n" % ("%f %f" % (self.time, self.memchange_in), pad, self.description)
 				if maxdepth > 0 and depth < maxdepth or maxdepth == 0:		
 					for ch in self.items:
 						s += ch.toString(maxdepth, depth + 1)
 				return s
 			else:
-				s = "- %f > %s\n" % (self.memchange_in, self.description)
+				s = "%-20s %s> %s\n" % ("- %f" % (self.memchange_in,), pad, self.description)
 				if maxdepth > 0 and depth < maxdepth or maxdepth == 0:		
 					for ch in self.items:
 						s += ch.toString(maxdepth, depth + 1)
-				s += "%f %f < %s\n" % (self.time, self.memchange_out, self.description)
+				s += "%-20s %s< %s\n" % ("%f %f" % (self.time, self.memchange_out), pad, self.description)
 				return s
 		else:
-			return "%f %f + %s\n" % (self.time, self.memchange_in, self.description)
+			return "%-20s %s+ %s\n" % ("%f %f" % (self.time, self.memchange_in), pad, self.description)
 		
 	
 def fromString(tracestr):
@@ -260,6 +300,10 @@ def fromString(tracestr):
 	
 	if not found_start:
 		raise ValueError("Invalid trace string format!")
+	
+	# update the root time to reflect its children, the raw trace excludes this time
+	for ch in root.items:
+		root.time += ch.time
 		
 	return root
 	
