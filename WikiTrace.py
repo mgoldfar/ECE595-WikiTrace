@@ -1,4 +1,6 @@
 import os, sys
+import memcache
+
 
 class DBTraceStats:
 	def __init__(self):
@@ -47,14 +49,53 @@ class CacheTraceStats:
 			missp = 0
 	
 		return "CACHE: Access %d, Hit %d %2.3f%%, Miss %d %2.3f%%" % (self.access, self.hits, hitp, self.misses, missp)
+
+class Trace:
+	
+	def __init__(self):
+		self.memcache_server = None
+		self.memcache_key = None
+		self.filename = None
+		self.root = None
+		
+	def loadFromFile(self, filename):
+		self.filename = filename
+		with open(filename, "r") as f:
+			tracestr = f.read()
+		
+		self.root = fromString(tracestr)
+			
+	def saveToFile(self, filename):
+		with open(filename, "w") as f:
+			tracestr = self.root.toString()
+			f.write(tracestr)
+		
+	def loadFromMemcache(self, memcache_key, memcache_server=None):
+		if not memcache_server:
+			self.memcache_server = "localhost:11211"
+		else:	
+			self.memcache_server = memcache_server
+			
+		self.memcache_key = memcache_key
+		
+		mc = memcache.Client([self.memcache_server])
+		tracestr = mc.get(memcache_key)
+		if not tracestr:
+			raise KeyError(memcache_key)
+			
+		self.root = fromString(tracestr)
 		
 class TraceItem:
 	def __init__(self, description, parent):
 		self.description = description
 		self.time = 0.0
+		self.memchange_in = 0.0
+		self.memchange_out = 0.0
 		self.level = 0
+
 		if parent != None:
 			self.level = parent.level + 1
+
 		self.items = []
 		self.parent = parent
 		
@@ -151,18 +192,26 @@ class TraceItem:
 	def __str__(self):
 		return "%f %s\n" % (self.time, self.description)
 	
-	def getTraceString(self, maxdepth=0, depth=0):
-		pad = ""
-		for i in range(self.level):
-			pad += " "
-				
-		s = "%s%s" % (pad, str(self))
-		
-		if maxdepth > 0 and depth < maxdepth or maxdepth == 0:		
-			for ch in self.items:
-				s += ch.getTraceString(maxdepth, depth + 1)
+	def toString(self, maxdepth=0, depth=0):
+		"""Reproduces the oroginal trace string."""
+		if len(self.items) > 0:
 			
-		return s
+			# special parent object:
+			if self.parent == None:
+				s = "%f %f < %s\n" % (self.time, self.memchange_in, self.description)
+				if maxdepth > 0 and depth < maxdepth or maxdepth == 0:		
+					for ch in self.items:
+						s += ch.toString(maxdepth, depth + 1)
+				return s
+			else:
+				s = "- %f > %s\n" % (self.memchange_in, self.description)
+				if maxdepth > 0 and depth < maxdepth or maxdepth == 0:		
+					for ch in self.items:
+						s += ch.toString(maxdepth, depth + 1)
+				s += "%f %f < %s\n" % (self.time, self.memchange_out, self.description)
+				return s
+		else:
+			return "%f %f + %s\n" % (self.time, self.memchange_in, self.description)
 		
 	
 def fromString(tracestr):
@@ -181,7 +230,7 @@ def fromString(tracestr):
 		
 		if not found_start:
 			# special -setup line in the trace	
-			if len(line) >= 4 and line[2] == "<" and line[3] == "-setup":
+			if len(line) >= 4 and line[2] == "<":
 				root.time = float(line[0])
 				found_start = True
 			continue
@@ -190,21 +239,27 @@ def fromString(tracestr):
 		if line[2] == ">": # entering function
 			parent = item_stack[len(item_stack) - 1]
 			item = TraceItem(" ".join(line[3:]), parent)
+			item.memchange_in = float(line[1])
 			item_stack.append(item)
 			parent.add_item(item)
 
 		elif line[2] == "<" and line[3] != "-setup": # exiting a trace
 			item = item_stack.pop()
 			if item == root:
-				raise Exception("Trace is not properly formed!")
+				raise ValueError("Trace is not properly balanced!")
 				
 			item.time = float(line[0])
+			item.memchange_out = float(line[1])
 
 		elif line[2] == "+" and line[3] != "-setup":
 			parent = item_stack[len(item_stack) - 1]
 			item = TraceItem(" ".join(line[3:]), parent)
 			item.time = float(line[0])
+			item.memchange_in = float(line[1])
 			parent.add_item(item)
-			
+	
+	if not found_start:
+		raise ValueError("Invalid trace string format!")
+		
 	return root
 	

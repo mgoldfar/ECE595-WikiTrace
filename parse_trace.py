@@ -3,34 +3,19 @@
 import os, sys
 import WikiTrace
 		
-import memcache
 import gzip
 import StringIO
 import sys
 
-if len(sys.argv) > 3 or len(sys.argv) < 2:
-	sys.stderr.write("usage: parse_trace.py <trace id> [host:port]\n")
-	sys.exit(1)
-	
-if len(sys.argv) == 2:
-	server = "localhost:11211"
-else:
-	server = sys.argv[2]
-
-mc = memcache.Client([server], debug=True)
-
-tracestr = mc.get(sys.argv[1])
-if not tracestr:
-	sys.stderr.write("Trace does not exist: %s\n" % (sys.argv[1],))
+if len(sys.argv) != 2:
+	sys.stderr.write("usage: parse_trace.py <trace id>\n")
 	sys.exit(1)
 
-print tracestr
+trace = WikiTrace.Trace()
+trace.loadFromMemcache(sys.argv[1])
 
-#io = StringIO.StringIO(tracestr)
-#tracestr = "".join(gzip.GzipFile(fileobj=io).readlines())
-#print tracestr
+root = trace.root
 
-root = WikiTrace.fromString(tracestr)
 total_time = root.get_time()
 
 db_stats = root.get_database_stats()
