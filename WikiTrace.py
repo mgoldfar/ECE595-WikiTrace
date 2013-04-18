@@ -9,7 +9,10 @@ class DBTraceStats:
 		self.read_t = 0.0
 		self.write_t = 0.0
 		self.other_t = 0.0
-	
+		self.load_balancer_calls = 0
+		self.load_balancer_time = 0.0
+		self.connections_opened = 0
+		
 	def add(self, other):
 		r = DBTraceStats()
 		r.reads = self.reads + other.reads
@@ -18,13 +21,16 @@ class DBTraceStats:
 		r.read_t = self.read_t + other.read_t
 		r.write_t = self.write_t + other.write_t
 		r.other_t = self.other_t + other.other_t
+		r.load_balancer_calls = self.load_balancer_calls + other.load_balancer_calls
+		r.load_balancer_time = self.load_balancer_time + other.load_balancer_time
+		r.connections_opened = self.connections_opened + other.connections_opened
 		return r
 	
 	def get_total_time(self):
-		return self.read_t + self.write_t + self.other_t
+		return self.read_t + self.write_t + self.other_t + r.load_balancer_time
 	
 	def __str__(self):
-		return "DB: R %d %2.3f, W %d %2.3f, O %d %2.3f" % (self.reads, self.read_t, self.writes, self.write_t, self.other, self.other_t)
+		return "DB: Rd %d %f, Wr %d %f, Ot %d %f, LB %d %f, Conns %d" % (self.reads, self.read_t, self.writes, self.write_t, self.other, self.other_t, self.load_balancer_calls, self.load_balancer_time, self.connections_opened)
 		
 class CacheTraceStats:
 	def __init__(self):
@@ -47,7 +53,7 @@ class CacheTraceStats:
 			hitp = 0
 			missp = 0
 	
-		return "CACHE: Access %d, Hit %d %2.3f%%, Miss %d %2.3f%%" % (self.access, self.hits, hitp, self.misses, missp)
+		return "CACHE: Access %d, Hit %d %f%%, Miss %d %f%%" % (self.access, self.hits, hitp, self.misses, missp)
 
 class Trace:
 	
@@ -82,21 +88,82 @@ class Trace:
 		if not tracestr:
 			raise KeyError(memcache_key)
 			
-		self.root = fromString(tracestr)
+		self.root = Trace.fromString(tracestr)
+		
+	@staticmethod	
+	def fromString(tracestr):
+		cur_level = 0
+		root = TraceItem("trace", None)
+		item_stack = [root]
+
+		linen = 0
+		found_start = False
+		for line in tracestr.split('\n'):
+			line = line.strip().split()
+			linen += 1
+
+			if not line:
+				continue
+
+			if not found_start:
+				# special -setup line in the trace	
+				if len(line) >= 4 and line[2] == "<":
+					root.time = float(line[0])
+					found_start = True
+				continue
+
+
+			if line[2] == ">": # entering function
+				parent = item_stack[-1]
+				item = TraceItem(" ".join(line[3:]), parent)
+				item.memchange_in = float(line[1])
+				item_stack.append(item)
+				parent.add_item(item)
+
+			elif line[2] == "<": # exiting a trace
+				item = item_stack.pop()
+				if item == root:
+					raise ValueError("Trace is not properly balanced!")
+
+				# for nodes with children the time represents the total time spend for the
+				# statements in that call, total time is computed by aggergating the children
+				item.time = float(line[0])
+				item.memchange_out = float(line[1])
+
+			elif line[2] == "+":
+				parent = item_stack[-1]
+				item = TraceItem(" ".join(line[3:]), parent)
+				item.time = float(line[0])
+				item.memchange_in = float(line[1])
+				parent.add_item(item)
+
+		if not found_start:
+			raise ValueError("Invalid trace string format!")
+
+		# update the root time to reflect its children, the raw trace excludes this time
+		for ch in root.items:
+			root.time += ch.time
+
+		return root
 		
 class TraceItem:
+	__LastID = 0
 	def __init__(self, description, parent):
 		self.description = description
 		self.time = 0.0
 		self.memchange_in = 0.0
 		self.memchange_out = 0.0
 		self.level = 0
-
+		
 		if parent != None:
 			self.level = parent.level + 1
 
 		self.items = []
 		self.parent = parent
+		
+		# Unique ID for items
+		TraceItem.__LastID += 1
+		self.id = TraceItem.__LastID
 
 	def clone(self, shallow=False):
 		"""Creates a duplicate of this node an all children."""
@@ -105,14 +172,17 @@ class TraceItem:
 		new_item.memchange_in = self.memchange_in
 		new_item.memchange_out = self.memchange_out
 		new_item.level = self.level
+		new_item.id = self.id
+		new_item.parent = self.parent
 		
 		if not shallow:
 			for ch in self.items:
-				new_ch = ch.clone()
+				new_ch = ch.clone(shallow)
 				new_item.add_item(new_ch)
 				new_ch.parent = new_item
 		else:
 			new_item.items.extend(self.items)
+			
 		return new_item
 			
 	def add_item(self, item):
@@ -144,6 +214,7 @@ class TraceItem:
 		stats = DBTraceStats()
 		for n in nodes: 
 			qnodes = n.get_nodes(["query:"])
+			lbnodes = n.get_nodes(["LoadBalancer::"])
 			nodes_r = []
 			nodes_w = []
 			nodes_o = []
@@ -164,14 +235,17 @@ class TraceItem:
 			for m in nodes_o:
 				stats.other += 1
 				stats.other_t += m.time
-
+			for m in lbnodes:
+				stats.load_balancer_calls += 1
+				stats.load_balancer_time += m.get_time()
+			stats.connections_opened = len(n.get_nodes(["LoadBalancer::reallyOpenConnection"]))
 		return stats
 			
 	def get_nodes(self, prefixes=None):
 		"""Gets the nodes that contain the specified prefixes"""
 	
 		if not prefixes:
-			return self.items
+			return [self]
 		
 		nodes = []
 		
@@ -182,41 +256,47 @@ class TraceItem:
 			for ch in self.items:
 				nodes.extend(ch.get_nodes(prefixes))
 			return nodes
-			
+	
+	def _get_node_by_id(self, i):
+		"""Internal. Gets a the node that matches the specified ID."""
+		if self.id == i:
+			return self
+		
+		for ch in self.items:
+			foundch = ch._get_node_by_id(i)
+			if foundch != None:
+				return foundch
+		
+		return None
+		
 	def remove_subtrees(self, nodes):
 		"""Removes the subtrees rooted by the elements of nodes. This creates a duplicate trace item."""
+		worklist = list(nodes)
+		new_root = self.clone()
+
+		for n in nodes:
+			m = new_root._get_node_by_id(n.id)
+			if m == None:
+				continue # subtree was already removed because a parent subtree was removed
 				
-		# leaf node
-		if len(self.items) == 0:
-			if self not in nodes:
-				return self.clone()
-			else:
-				return None
-		
-		new_children = []
-		subtracted_time = 0.0
-		for ch in self.items:
-			if ch not in nodes:
-				new_subtree = ch.remove_subtrees(nodes)
-				if new_subtree:
-					new_children.append(new_subtree)
-			else:
-				subtracted_time += ch.time
-		
-		new_root = self.clone(True) # shallow copy
-		new_root.items = new_children # repace children
-		new_root.time = 0.0 
-		for ch in new_root.items: 
-			new_root.time += ch.time # reompute node time
-			ch.parent = new_root # update parent node
+			if m.parent == None:
+				raise Exception("Can not remove subtree because node is not a child!")
 			
+			m.parent.items.remove(m) # remove the item
+			
+			# propagate the removed time upwards to all parent nodes
+			p = m.parent
+			while p != None:
+				p.time -= m.time
+				p = p.parent
+
 		return new_root
 		
 	def get_nodes_containing(self, substrs=None):
 		"""Gets a list of any nodes that contain a substrings"""
 		
 		if not substrs:
-			return self.items
+			return [self]
 		
 		if  any(( self.description.find(p) >= 0 for p in substrs )):
 			return [self]
@@ -252,58 +332,41 @@ class TraceItem:
 				return s
 		else:
 			return "%-20s %s+ %s\n" % ("%f %f" % (self.time, self.memchange_in), pad, self.description)
-		
 	
-def fromString(tracestr):
-	cur_level = 0
-	root = TraceItem("trace", None)
-	item_stack = [root]
-
-	linen = 0
-	found_start = False
-	for line in tracestr.split('\n'):
-		line = line.strip().split()
-		linen += 1
 		
-		if not line:
-			continue
-		
-		if not found_start:
-			# special -setup line in the trace	
-			if len(line) >= 4 and line[2] == "<":
-				root.time = float(line[0])
-				found_start = True
-			continue
+class TraceSet:
+	def __init__(self):
+		self.items = {}
+	
+	def set(self, key, item):
+		self.items[key] = item
+	
+	def get(self, key):
+		return self.items[key]
+	
+	def save(self, directory_name):
+		if not os.path.exists(directory_name) and not os.path.isdir(directory_name):
+			os.mkdir(directory_name)
 			
-
-		if line[2] == ">": # entering function
-			parent = item_stack[len(item_stack) - 1]
-			item = TraceItem(" ".join(line[3:]), parent)
-			item.memchange_in = float(line[1])
-			item_stack.append(item)
-			parent.add_item(item)
-
-		elif line[2] == "<" and line[3] != "-setup": # exiting a trace
-			item = item_stack.pop()
-			if item == root:
-				raise ValueError("Trace is not properly balanced!")
-				
-			item.time = float(line[0])
-			item.memchange_out = float(line[1])
-
-		elif line[2] == "+" and line[3] != "-setup":
-			parent = item_stack[len(item_stack) - 1]
-			item = TraceItem(" ".join(line[3:]), parent)
-			item.time = float(line[0])
-			item.memchange_in = float(line[1])
-			parent.add_item(item)
+		for k, v in self.items.iteritems():
+			filepath = os.path.join(directory_name, k)
+			v.saveToFile(filepath)
 	
-	if not found_start:
-		raise ValueError("Invalid trace string format!")
-	
-	# update the root time to reflect its children, the raw trace excludes this time
-	for ch in root.items:
-		root.time += ch.time
+	def getAggergateTimeForNodes(self, prefixes=None):
+		t = 0.0
+		for k, v in self.items.iteritems():
+			t += v.root.get_time(prefixes)
+		return t
+			
+	def getAggergateDBStats(self, prefixes=None):
+		s = DBTraceStats()
+		for k, v in self.items.iteritems():
+			s = s.add(v.root.get_database_stats(prefixes))
+		return s
 		
-	return root
-	
+	def getAggergateCacheStats(self, prefixes=None):
+		s = CacheTraceStats()
+		for k, v in self.items.iteritems():
+			s = s.add(v.root.get_cache_stats(prefixes))
+		return s
+		
