@@ -30,8 +30,10 @@ grinder.threads = 1
 grinder.useConsole = false
 grinder.logDirectory = log
 
-request.baseid = $BASEID
-request.url = http://sdcranch10.ecn.purdue.edu
+ece595.testname = $TESTNAME
+ece595.baseid = $BASEID
+ece595.traceserver = 128.46.214.190:11211
+ece595.url = http://sdcranch10.ecn.purdue.edu
 EOL
 
 for f in $*
