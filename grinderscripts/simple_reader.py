@@ -9,7 +9,8 @@ import random
 
 REQUEST_ID_PREFIX="SimpleReader"
 
-serverURL = grinder.properties.getProperty("server.url")
+serverURL = grinder.properties.getProperty("request.url")
+baseID = int(grinder.properties.getProperty("request.baseid"))
 
 test = Test(1, REQUEST_ID_PREFIX)
 request = HTTPRequest()
@@ -17,5 +18,5 @@ test.record(request)
 
 class TestRunner:
   def __call__(self):
-	result = request.GET(serverURL + "/index.php/Ethernet?RequestID=%s-%d" % (REQUEST_ID_PREFIX, grinder.runNumber))
+	result = request.GET(serverURL + "/index.php/Ethernet?RequestID=%s-%d" % (REQUEST_ID_PREFIX, baseID + grinder.runNumber))
 	print result
