@@ -1,2 +1,2 @@
 #! /bin/sh -x
-java -Xmx1g -cp lib/grinder.jar:/home/office/ECE595-WikiTrace/grinder-3.11 net.grinder.Grinder $1
+java -Xmx1g -cp $CLASSPATH net.grinder.Grinder $1
