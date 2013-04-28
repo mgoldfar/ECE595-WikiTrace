@@ -16,7 +16,7 @@ do
 				((i++))
 		fi
 		
-		if (( NHOSTS > 0 && i > NHOSTS ))
+		if (( NHOSTS > 0 && i >= NHOSTS ))
 		then
 			break
 		fi
