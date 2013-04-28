@@ -23,8 +23,7 @@ hosts=($(get_live_ecelinux_hosts.sh $NUMHOSTS))
 ((baseid=0))
 for h in ${hosts[*]}
 do
-		
-		CMDINITSTR="source ~/.bash_profile; cd wiki_trace/grinderscripts;"
+		CMDINITSTR="source ~/.bash_profile; cd wiki_trace/grinderscripts; cat ./run_test.sh"
 		CMDSTR="./run_test.sh $TESTNAME $baseid $NRUNS $@"
 		ssh -o StrictHostKeyChecking=no mgoldfar@$h "$CMDINITSTR $CMDSTR" &
 		((baseid++))
