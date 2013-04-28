@@ -1,75 +1,22 @@
 import os, sys
 import memcache
 
-class DBTraceStats:
-	def __init__(self):
-		self.reads = 0
-		self.writes = 0
-		self.other = 0
-		self.read_t = 0.0
-		self.write_t = 0.0
-		self.other_t = 0.0
-		self.load_balancer_calls = 0
-		self.load_balancer_time = 0.0
-		self.connections_opened = 0
-		
-	def add(self, other):
-		r = DBTraceStats()
-		r.reads = self.reads + other.reads
-		r.writes = self.writes + other.writes
-		r.other = self.other + other.other
-		r.read_t = self.read_t + other.read_t
-		r.write_t = self.write_t + other.write_t
-		r.other_t = self.other_t + other.other_t
-		r.load_balancer_calls = self.load_balancer_calls + other.load_balancer_calls
-		r.load_balancer_time = self.load_balancer_time + other.load_balancer_time
-		r.connections_opened = self.connections_opened + other.connections_opened
-		return r
-	
-	def get_total_time(self):
-		return self.read_t + self.write_t + self.other_t + r.load_balancer_time
-	
-	def __str__(self):
-		return "DB: Rd %d %f, Wr %d %f, Ot %d %f, LB %d %f, Conns %d" % (self.reads, self.read_t, self.writes, self.write_t, self.other, self.other_t, self.load_balancer_calls, self.load_balancer_time, self.connections_opened)
-		
-class CacheTraceStats:
-	def __init__(self):
-		self.access = 0
-		self.hits = 0
-		self.misses = 0
-	
-	def add(self, other):
-		s = CacheTraceStats()
-		s.access = self.access + other.access
-		s.hits = self.hits + other.hits
-		s.misses = self.misses + other.misses
-		return s
-	
-	def __str__(self):
-		if self.access > 0:
-			hitp = 100*float(self.hits)/self.access
-			missp = 100*float(self.misses)/self.access
-		else:
-			hitp = 0
-			missp = 0
-	
-		return "CACHE: Access %d, Hit %d %f%%, Miss %d %f%%" % (self.access, self.hits, hitp, self.misses, missp)
-
 class Trace:
 	
 	def __init__(self):
 		self.memcache_server = None
 		self.memcache_key = None
 		self.filename = None
-		self.root = None
+		self.root = None # root node of the trace tree
+		self.info = {} # dictionary of key=value pairs from trace
 		
 	def loadFromFile(self, filename):
 		self.filename = filename
 		with open(filename, "r") as f:
 			tracestr = f.read()
 		
-		self.root = fromString(tracestr)
-			
+		self.loadFromString(tracestr)
+	
 	def saveToFile(self, filename):
 		with open(filename, "w") as f:
 			tracestr = self.root.toString()
@@ -78,8 +25,15 @@ class Trace:
 	def loadFromMemcache(self, memcache_key, memcache_server=None):
 		if not memcache_server:
 			self.memcache_server = "localhost:11211"
-		else:	
-			self.memcache_server = memcache_server
+		else:
+			# use default port if non given	
+			server_and_port = memcache_server.split(":", 1)
+			if len(srver_and_port) == 1:
+				port = 11211
+			else:
+				port = int(server_and_port[1])
+			
+			self.memcache_server = "%s:%d" % (server_and_port[0], port)
 			
 		self.memcache_key = memcache_key
 		
@@ -87,18 +41,18 @@ class Trace:
 		tracestr = mc.get(memcache_key)
 		if not tracestr:
 			raise KeyError(memcache_key)
-			
-		self.root = Trace.fromString(tracestr)
 		
-	@staticmethod	
-	def fromString(tracestr):
+		self.loadFromString(tracestr)
+			
+	def loadFromString(self, tracestr):
 		cur_level = 0
-		root = TraceItem("trace", None)
-		item_stack = [root]
+		self.root = TraceItem("trace", None)
+		item_stack = [self.root]
 
 		linen = 0
 		found_start = False
 		for line in tracestr.split('\n'):
+			origline = line
 			line = line.strip().split()
 			linen += 1
 
@@ -108,8 +62,14 @@ class Trace:
 			if not found_start:
 				# special -setup line in the trace	
 				if len(line) >= 4 and line[2] == "<":
-					root.time = float(line[0])
+					self.root.time = float(line[0])
 					found_start = True
+				else:
+					# Try to extract a key=value pair:
+					kv = origline.split("=", 1)
+					if len(kv) == 2:
+						self.info[kv[0]] = kv[1]
+						
 				continue
 
 
@@ -122,7 +82,7 @@ class Trace:
 
 			elif line[2] == "<": # exiting a trace
 				item = item_stack.pop()
-				if item == root:
+				if item == self.root:
 					raise ValueError("Trace is not properly balanced!")
 
 				# for nodes with children the time represents the total time spend for the
@@ -141,10 +101,15 @@ class Trace:
 			raise ValueError("Invalid trace string format!")
 
 		# update the root time to reflect its children, the raw trace excludes this time
-		for ch in root.items:
-			root.time += ch.time
-
-		return root
+		for ch in self.root.items:
+			self.root.time += ch.time
+	
+	def toString(self):
+		s = ""
+		for k, v in self.info:
+			s += "%s=%s\n" % (k, v)
+		s += self.root.toString()
+		return s
 		
 class TraceItem:
 	__LastID = 0
@@ -213,16 +178,17 @@ class TraceItem:
 		nodes = self.get_nodes(prefixes)
 		stats = DBTraceStats()
 		for n in nodes: 
-			qnodes = n.get_nodes(["query:"])
+			qnodes = n.get_nodes(["DatabaseBase::query"])
 			lbnodes = n.get_nodes(["LoadBalancer::"])
 			nodes_r = []
 			nodes_w = []
 			nodes_o = []
 			for k in range(len(qnodes)):
 				qn = qnodes[0]
-				if qn.description.startswith("query: SELECT"):
+				ch = qn.items[0]
+				if ch.description.startswith("DatabaseMysql::doQuery SELECT"):
 					nodes_r.append(qnodes.pop(0))
-				elif qn.description.startswith("query: UPDATE") or qn.description.startswith("query: INSERT") or qn.description.startswith("query: DELETE"):
+				elif any([ch.description.startswith(x) for x in ["DatabaseMysql::doQuery UPDATE", "DatabaseMysql::doQuery INSERT", "DatabaseMysql::doQuery DELETE"]]):
 					nodes_w.append(qnodes.pop(0))
 				else:
 					nodes_o.append(qnodes.pop(0))
@@ -369,4 +335,58 @@ class TraceSet:
 		for k, v in self.items.iteritems():
 			s = s.add(v.root.get_cache_stats(prefixes))
 		return s
-		
+
+class DBTraceStats:
+	def __init__(self):
+		self.reads = 0
+		self.writes = 0
+		self.other = 0
+		self.read_t = 0.0
+		self.write_t = 0.0
+		self.other_t = 0.0
+		self.load_balancer_calls = 0
+		self.load_balancer_time = 0.0
+		self.connections_opened = 0
+
+	def add(self, other):
+		r = DBTraceStats()
+		r.reads = self.reads + other.reads
+		r.writes = self.writes + other.writes
+		r.other = self.other + other.other
+		r.read_t = self.read_t + other.read_t
+		r.write_t = self.write_t + other.write_t
+		r.other_t = self.other_t + other.other_t
+		r.load_balancer_calls = self.load_balancer_calls + other.load_balancer_calls
+		r.load_balancer_time = self.load_balancer_time + other.load_balancer_time
+		r.connections_opened = self.connections_opened + other.connections_opened
+		return r
+
+	def get_total_time(self):
+		return self.read_t + self.write_t + self.other_t + r.load_balancer_time
+
+	def __str__(self):
+		return "DB: Rd %d %f, Wr %d %f, Ot %d %f, LB %d %f, Conns %d" % (self.reads, self.read_t, self.writes, self.write_t, self.other, self.other_t, self.load_balancer_calls, self.load_balancer_time, self.connections_opened)
+
+class CacheTraceStats:
+	def __init__(self):
+		self.access = 0
+		self.hits = 0
+		self.misses = 0
+
+	def add(self, other):
+		s = CacheTraceStats()
+		s.access = self.access + other.access
+		s.hits = self.hits + other.hits
+		s.misses = self.misses + other.misses
+		return s
+
+	def __str__(self):
+		if self.access > 0:
+			hitp = 100*float(self.hits)/self.access
+			missp = 100*float(self.misses)/self.access
+		else:
+			hitp = 0
+			missp = 0
+
+		return "CACHE: Access %d, Hit %d %f%%, Miss %d %f%%" % (self.access, self.hits, hitp, self.misses, missp)
+	
