@@ -18,5 +18,5 @@ test.record(request)
 
 class TestRunner:
   def __call__(self):
-	result = request.GET(serverURL + "/index.php/Ethernet?RequestID=%s-%d" % (REQUEST_ID_PREFIX, baseID + grinder.runNumber))
+	result = request.GET(serverURL + "/index.php/Ethernet?RequestID=%s-%d" % (REQUEST_ID_PREFIX, baseID*grinder.runs + grinder.runNumber))
 	print result
