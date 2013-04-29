@@ -23,7 +23,7 @@ shift 3
 hosts=($(get_live_ecelinux_hosts.sh $NUMHOSTS))
 
 # all hosts share files so make sure git is uptodate
-ssh -o StrictHostKeyChecking=no mgoldfar@${hosts[0]} "cd ${GRINDER_SCRIPT_DIR}; git pull;" &
+ssh -o StrictHostKeyChecking=no mgoldfar@${hosts[0]} "cd ${GRINDER_SCRIPT_DIR}; git pull;"
 
 ((baseid=0))
 for h in ${hosts[*]}
