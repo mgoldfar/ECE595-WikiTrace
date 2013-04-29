@@ -20,5 +20,8 @@ test.record(request)
 class TestRunner:
   def __call__(self):
 	traceindex = baseID*runs + grinder.runNumber
-	result = request.GET(serverURL + "/index.php/Ethernet?RequestID=%s-%d&TraceServer=%s" % (testName, traceindex, traceServer))
+	theurl = serverURL + "/index.php/Ethernet?RequestID=%s-%d&TraceServer=%s" % (testName, traceindex, traceServer)
+	
+	print "Making request to %s" % (theurl, )
+	result = request.GET(theurl)
 	print result
