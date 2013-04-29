@@ -12,6 +12,8 @@ then
 	exit 1
 fi
 
+GRINDER_SCRIPT_DIR=wiki_trace/grinderscripts
+
 NUMHOSTS=$1
 TESTNAME=$2
 NRUNS=$3
@@ -20,10 +22,13 @@ shift 3
 # get NUMHOSTS live hosts
 hosts=($(get_live_ecelinux_hosts.sh $NUMHOSTS))
 
+# all hosts share files so make sure git is uptodate
+ssh -o StrictHostKeyChecking=no mgoldfar@${hosts[0]} "cd ${GRINDER_SCRIPT_DIR}; git pull;" &
+
 ((baseid=0))
 for h in ${hosts[*]}
 do
-		CMDINITSTR="source ~/.bash_profile; cd wiki_trace/grinderscripts; cat ./run_test.sh"
+		CMDINITSTR="source ~/.bash_profile; cd ${GRINDER_SCRIPT_DIR};"
 		CMDSTR="./run_test.sh $TESTNAME $baseid $NRUNS $@"
 		ssh -o StrictHostKeyChecking=no mgoldfar@$h "$CMDINITSTR $CMDSTR" &
 		((baseid++))
