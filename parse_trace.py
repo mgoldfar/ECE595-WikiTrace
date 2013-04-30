@@ -25,8 +25,8 @@ if start < 0 or end < 0 or start > end:
 	sys.exit(1)
 
 
-if not os.path.exits(trace_archive_dir):
-	os.path.mkdir(trace_archive_dir)
+if not os.path.exists(trace_archive_dir):
+	os.mkdir(trace_archive_dir)
 
 traces = WikiTrace.TraceSet()
 
@@ -48,6 +48,10 @@ resldr_cache_stats = WikiTrace.CacheTraceStats()
 rev_time = 0.0
 rev_db_stats = WikiTrace.DBTraceStats()
 rev_cache_stats = WikiTrace.CacheTraceStats()
+
+linker_time = 0.0
+linker_db_stats = WikiTrace.DBTraceStats()
+linker_cache_stats = WikiTrace.CacheTraceStats()
 
 for i in range(start, end+1):
 	traceid = "%s-%d" % (sys.argv[1], i)
