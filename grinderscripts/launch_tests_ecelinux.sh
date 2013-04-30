@@ -26,15 +26,18 @@ hosts=($(get_live_ecelinux_hosts.sh $NUMHOSTS))
 ssh -o StrictHostKeyChecking=no mgoldfar@${hosts[0]} "cd ${GRINDER_SCRIPT_DIR}; git pull;"
 
 ((baseid=0))
+pids=()
 for h in ${hosts[*]}
 do
 		CMDINITSTR="source ~/.bash_profile; cd ${GRINDER_SCRIPT_DIR};"
 		CMDSTR="./run_test.sh $TESTNAME $baseid $NRUNS $@"
 		ssh -o StrictHostKeyChecking=no mgoldfar@$h "$CMDINITSTR $CMDSTR" &
+		pids[$baseid]=$!
 		((baseid++))
 done &
 
 # wait for all remote hosts to exit
-wait $!
+echo "Waiting for processes to finish: ${pids[*]}"
+wait ${pids[*]}
 
 exit 0
