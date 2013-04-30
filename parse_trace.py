@@ -8,15 +8,17 @@ import StringIO
 import sys
 
 if len(sys.argv) != 4 and len(sys.argv) != 5 :
-	sys.stderr.write("usage: parse_trace.py <trace id> <start> <end> [trace_archive_dir=trace_archive]\n")
+	sys.stderr.write("usage: parse_trace.py <trace id> <start> <end> [trace_archive_dir=traces]\n")
 	sys.exit(1)
 
 traceid_base = sys.argv[1]
 start = int(sys.argv[2])
 end = int(sys.argv[3])
+load_from_trace_dir = False
+trace_archive_dir="traces"
 
-trace_archive_dir="trace"
 if len(sys.argv) == 5:
+	load_from_trace_dir = True
 	trace_archive_dir = sys.argv[4]
 
 
@@ -56,11 +58,13 @@ linker_cache_stats = WikiTrace.CacheTraceStats()
 for i in range(start, end+1):
 	traceid = "%s-%d" % (sys.argv[1], i)
 	trace = WikiTrace.Trace()
-	trace.loadFromMemcache(traceid)
 	
-	# save it incase we want to use it later
-	trace.saveToFile(os.path.join(trace_archive_dir, traceid))
-	
+	if not load_from_trace_dir:
+		trace.loadFromMemcache(traceid)
+		trace.saveToFile(os.path.join(trace_archive_dir, traceid))
+	else:
+		trace.loadFromFile(os.path.join(trace_archive_dir, traceid))
+
 	total_exec_time += trace.root.get_time(["Parser::", "ParserCache::"])
 	total_db_stats.add(trace.root.get_database_stats(["LocalisationCache::"]))
 	loc_cache_cache_stats.add(trace.root.get_cache_stats(["LocalisationCache::"]))

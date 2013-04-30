@@ -20,7 +20,7 @@ class Trace:
 	
 	def saveToFile(self, filename):
 		with open(filename, "w") as f:
-			tracestr = self.root.toString()
+			tracestr = self.toString()
 			f.write(tracestr)
 		
 	def loadFromMemcache(self, memcache_key, memcache_server=None):
