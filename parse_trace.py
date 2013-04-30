@@ -7,7 +7,7 @@ import gzip
 import StringIO
 import sys
 
-if len(sys.argv) != 4 or len(sys.argv) != 5 :
+if len(sys.argv) != 4 and len(sys.argv) != 5 :
 	sys.stderr.write("usage: parse_trace.py <trace id> <start> <end> [trace_archive_dir=trace_archive]\n")
 	sys.exit(1)
 
