@@ -4,7 +4,7 @@ if (( $# < 5 ))
 then
 	echo "usage: run_test.sh <test_name> <baseid> <nruns> <script> [addl files]"
 	echo "  <test_name>   Name to identify the test (will be used as the prefix of the request)"
-	echo "  <baseid>      Number to indtify this test instance (used to ensure each client generates unique requests)"
+	echo "  <baseid>      Number to indentify this test instance (used to ensure each client generates unique requests)"
 	echo "  <nruns>       Number of run to execute the test for"
 	echo "  <cache_type>  Cache type. NONE, DBA, DB, MEMCACHED"
 	echo "  <script>      The main grinder script to run"
@@ -19,7 +19,7 @@ NRUNS=$3
 CACHETYPE=$4
 shift 4
 
-WORKDIR=$TESTNAME-$BASEID-$CACHETYPE
+WORKDIR=$TESTNAME-$BASEID
 
 mkdir -pv $WORKDIR
 
