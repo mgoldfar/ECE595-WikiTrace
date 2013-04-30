@@ -371,17 +371,17 @@ class DBTraceStats:
 		self.connections_opened = 0
 
 	def add(self, other):
-		r = DBTraceStats()
-		r.reads = self.reads + other.reads
-		r.writes = self.writes + other.writes
-		r.other = self.other + other.other
-		r.read_t = self.read_t + other.read_t
-		r.write_t = self.write_t + other.write_t
-		r.other_t = self.other_t + other.other_t
-		r.load_balancer_calls = self.load_balancer_calls + other.load_balancer_calls
-		r.load_balancer_time = self.load_balancer_time + other.load_balancer_time
-		r.connections_opened = self.connections_opened + other.connections_opened
-		return r
+		#r = DBTraceStats()
+		self.reads = self.reads + other.reads
+		self.writes = self.writes + other.writes
+		self.other = self.other + other.other
+		self.read_t = self.read_t + other.read_t
+		self.write_t = self.write_t + other.write_t
+		self.other_t = self.other_t + other.other_t
+		self.load_balancer_calls = self.load_balancer_calls + other.load_balancer_calls
+		self.load_balancer_time = self.load_balancer_time + other.load_balancer_time
+		self.connections_opened = self.connections_opened + other.connections_opened
+		return self
 
 	def get_total_time(self):
 		return self.read_t + self.write_t + self.other_t + r.load_balancer_time
@@ -396,11 +396,11 @@ class CacheTraceStats:
 		self.misses = 0
 
 	def add(self, other):
-		s = CacheTraceStats()
-		s.access = self.access + other.access
-		s.hits = self.hits + other.hits
-		s.misses = self.misses + other.misses
-		return s
+		#s = CacheTraceStats()
+		self.access = self.access + other.access
+		self.hits = self.hits + other.hits
+		self.misses = self.misses + other.misses
+		return self
 
 	def __str__(self):
 		if self.access > 0:
