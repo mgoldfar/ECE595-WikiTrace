@@ -65,13 +65,16 @@ for i in range(start, end+1):
 	else:
 		trace.loadFromFile(os.path.join(trace_archive_dir, traceid))
 
-	total_exec_time += trace.root.get_time(["Parser::", "ParserCache::"])
-	total_db_stats.add(trace.root.get_database_stats(["LocalisationCache::"]))
+	total_exec_time += trace.root.get_time()
+	total_db_stats.add(trace.root.get_database_stats())
+
+	loc_cache_time += trace.root.get_time(["LocalisationCache::"])
+	loc_cache_db_stats.add(trace.root.get_database_stats(["LocalisationCache::"]))
 	loc_cache_cache_stats.add(trace.root.get_cache_stats(["LocalisationCache::"]))
 	
-	parser_time += trace.root.get_time(["LocalisationCache::"])
+	parser_time += trace.root.get_time(["Parser::"])
 	parser_db_stats.add(trace.root.get_database_stats(["Parser::", "ParserCache::"]))
-	parser_cache_stats.add(trace.root.get_cache_stats(["Parser::", "ParserCache::"]))
+	parser_cache_stats.add(trace.root.get_cache_stats(["ParserCache::get"]))
 	
 	resldr_time += trace.root.get_time(["ResourceLoader::"])
 	resldr_db_stats.add(trace.root.get_database_stats(["ResourceLoader::"]))
@@ -99,8 +102,8 @@ print total_db_stats
 print
 
 print "Localization Stats:"
-print "Time = %f" % (total_exec_time, )
-print total_db_stats
+print "Time = %f" % (loc_cache_time, )
+print loc_cache_db_stats
 print loc_cache_cache_stats
 print 
 

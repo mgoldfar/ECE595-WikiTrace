@@ -16,8 +16,8 @@ class Trace:
 		with open(filename, "r") as f:
 			tracestr = f.read()
 		
-		self.loadFromString(tracestr)
-	
+		self.loadFromString(tracestr)	
+
 	def saveToFile(self, filename):
 		with open(filename, "w") as f:
 			tracestr = self.toString()
@@ -44,7 +44,7 @@ class Trace:
 			raise KeyError(memcache_key)
 		
 		self.loadFromString(tracestr)
-	
+
 	def _is_zlib_compressed(self, s):
 		if len(s) < 2:
 			return False
@@ -121,15 +121,11 @@ class Trace:
 
 		if not found_start:
 			raise ValueError("Invalid trace string format!")
-
-		# update the root time to reflect its children, the raw trace excludes this time
-		for ch in self.root.items:
-			self.root.time += ch.time
 	
 	def toString(self):
 		s = ""
-		for k, v in self.info:
-			s += "%s=%s\n" % (k, v)
+		for k in self.info:
+			s += "%s=%s\n" % (k, self.info[k])
 		s += self.root.toString()
 		return s
 		
@@ -191,6 +187,8 @@ class TraceItem:
 			subnodes_miss = n.get_nodes_containing(["CACHE MISS"])
 			stats.access += 1
 			stats.misses += len(subnodes_miss)
+			stats.time += n.get_time()
+
 		return stats
 		
 	def get_database_stats(self, prefixes=None):
@@ -385,11 +383,12 @@ class DBTraceStats:
 		return self.read_t + self.write_t + self.other_t + r.load_balancer_time
 
 	def __str__(self):
-		return "DB: Rd %d %f, Wr %d %f, Ot %d %f, LB %d %f, Conns %d" % (self.reads, self.read_t, self.writes, self.write_t, self.other, self.other_t, self.load_balancer_calls, self.load_balancer_time, self.connections_opened)
+		return "DB: Rd %d %f, Wr %d %f, Ot %d %f, LB %d %f, Conns %d, Time %f" % (self.reads, self.read_t, self.writes, self.write_t, self.other, self.other_t, self.load_balancer_calls, self.load_balancer_time, self.connections_opened, self.read_t + self.write_t + self.other_t)
 
 class CacheTraceStats:
 	def __init__(self):
 		self.access = 0
+		self.time = 0.0
 		self.hits = 0
 		self.misses = 0
 
@@ -398,6 +397,7 @@ class CacheTraceStats:
 		self.access = self.access + other.access
 		#self.hits = self.hits + other.hits
 		self.misses = self.misses + other.misses
+		self.time = self.time + other.time
 		return self
 
 	def __str__(self):
@@ -408,5 +408,5 @@ class CacheTraceStats:
 			hitp = 0
 			missp = 0
 
-		return "CACHE: Access %d, Hit %d %f%%, Miss %d %f%%" % (self.access, self.access - self.misses, hitp, self.misses, missp)
+		return "CACHE: Access %d, Hit %d %f%%, Miss %d %f%%, Time %f" % (self.access, self.access - self.misses, hitp, self.misses, missp, self.time)
 	
