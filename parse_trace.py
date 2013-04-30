@@ -7,17 +7,26 @@ import gzip
 import StringIO
 import sys
 
-if len(sys.argv) != 4:
-	sys.stderr.write("usage: parse_trace.py <trace id> <start> <end>\n")
+if len(sys.argv) != 4 or len(sys.argv) != 5 :
+	sys.stderr.write("usage: parse_trace.py <trace id> <start> <end> [trace_archive_dir=trace_archive]\n")
 	sys.exit(1)
 
 traceid_base = sys.argv[1]
 start = int(sys.argv[2])
 end = int(sys.argv[3])
 
+trace_archive_dir="trace"
+if len(sys.argv) == 5:
+	trace_archive_dir = sys.argv[4]
+
+
 if start < 0 or end < 0 or start > end:
 	sys.stderr.write("error: start must be less than or equal to end!\n")
 	sys.exit(1)
+
+
+if not os.path.exits(trace_archive_dir):
+	os.path.mkdir(trace_archive_dir)
 
 traces = WikiTrace.TraceSet()
 
@@ -44,6 +53,9 @@ for i in range(start, end+1):
 	traceid = "%s-%d" % (sys.argv[1], i)
 	trace = WikiTrace.Trace()
 	trace.loadFromMemcache(traceid)
+	
+	# save it incase we want to use it later
+	trace.saveToFile(os.path.join(trace_archive_dir, traceid))
 	
 	total_exec_time += trace.root.get_time(["Parser::", "ParserCache::"])
 	total_db_stats.add(trace.root.get_database_stats(["LocalisationCache::"]))
