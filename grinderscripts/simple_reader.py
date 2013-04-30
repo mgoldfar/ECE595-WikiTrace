@@ -21,7 +21,7 @@ test.record(request)
 class TestRunner:
   def __call__(self):
 	traceindex = baseID*runs + grinder.runNumber
-	theurl = serverURL + "/index.php/Ethernet?RequestID=%s-%d&TraceServer=%s&CompressTrace=gzip&cacheType=%s" % (testName, traceindex, traceServer, cacheType)
+	theurl = serverURL + "/index.php/Ethernet?RequestID=%s-%d&TraceServer=%s&CompressTrace=gzip&CacheType=%s" % (testName, traceindex, traceServer, cacheType)
 	
 	print "Making request to %s" % (theurl, )
 	result = request.GET(theurl)
