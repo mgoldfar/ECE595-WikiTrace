@@ -188,10 +188,8 @@ class TraceItem:
 		nodes = self.get_nodes(prefixes)
 		stats = CacheTraceStats()
 		for n in nodes:
-			subnodes_hit = n.get_nodes_containing(["CACHE HIT"])
 			subnodes_miss = n.get_nodes_containing(["CACHE MISS"])
-			stats.access += len(subnodes_hit) + len(subnodes_miss)
-			stats.hits += len(subnodes_hit)
+			stats.access += 1
 			stats.misses += len(subnodes_miss)
 		return stats
 		
@@ -398,17 +396,17 @@ class CacheTraceStats:
 	def add(self, other):
 		#s = CacheTraceStats()
 		self.access = self.access + other.access
-		self.hits = self.hits + other.hits
+		#self.hits = self.hits + other.hits
 		self.misses = self.misses + other.misses
 		return self
 
 	def __str__(self):
 		if self.access > 0:
-			hitp = 100*float(self.hits)/self.access
+			hitp = 100*float(self.access - self.misses)/self.access
 			missp = 100*float(self.misses)/self.access
 		else:
 			hitp = 0
 			missp = 0
 
-		return "CACHE: Access %d, Hit %d %f%%, Miss %d %f%%" % (self.access, self.hits, hitp, self.misses, missp)
+		return "CACHE: Access %d, Hit %d %f%%, Miss %d %f%%" % (self.access, self.access - self.misses, hitp, self.misses, missp)
 	
