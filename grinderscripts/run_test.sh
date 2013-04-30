@@ -1,11 +1,12 @@
 #! /bin/bash -e
 
-if (( $# < 4 ))
+if (( $# < 5 ))
 then
 	echo "usage: run_test.sh <test_name> <baseid> <nruns> <script> [addl files]"
 	echo "  <test_name>   Name to identify the test (will be used as the prefix of the request)"
 	echo "  <baseid>      Number to indtify this test instance (used to ensure each client generates unique requests)"
 	echo "  <nruns>       Number of run to execute the test for"
+	echo "  <cache_type>  Cache type. NONE, DBA, DB, MEMCACHED"
 	echo "  <script>      The main grinder script to run"
 	echo "  [addl files]  Additional files required by the script (e.g. modules, input files etc.)"
 	echo 
@@ -16,7 +17,8 @@ TESTNAME=$1
 WORKDIR=$1$2
 BASEID=$2
 NRUNS=$3
-shift 3
+CACHETYPE=$4
+shift 4
 
 mkdir -pv $WORKDIR
 
@@ -34,6 +36,7 @@ ece595.testname = $TESTNAME
 ece595.baseid = $BASEID
 ece595.traceserver = 128.46.214.190:11211
 ece595.url = http://sdcranch10.ecn.purdue.edu
+ece595.cachetype = $CACHETYPE
 EOL
 
 for f in $*

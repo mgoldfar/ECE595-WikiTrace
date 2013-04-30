@@ -11,6 +11,7 @@ testName = grinder.properties.getProperty("ece595.testname")
 serverURL = grinder.properties.getProperty("ece595.url")
 baseID = int(grinder.properties.getProperty("ece595.baseid"))
 traceServer = grinder.properties.getProperty("ece595.traceserver")
+cacheType = grinder.properties.getProperty("ece595.cachetype")
 runs =  int(grinder.properties.getProperty("grinder.runs"))
 
 test = Test(1, testName)
@@ -20,7 +21,7 @@ test.record(request)
 class TestRunner:
   def __call__(self):
 	traceindex = baseID*runs + grinder.runNumber
-	theurl = serverURL + "/index.php/Ethernet?RequestID=%s-%d&TraceServer=%s&CompressTrace=gzip" % (testName, traceindex, traceServer)
+	theurl = serverURL + "/index.php/Ethernet?RequestID=%s-%d&TraceServer=%s&CompressTrace=gzip&cacheType=%s" % (testName, traceindex, traceServer, cacheType)
 	
 	print "Making request to %s" % (theurl, )
 	result = request.GET(theurl)
