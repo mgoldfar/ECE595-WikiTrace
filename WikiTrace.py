@@ -121,6 +121,10 @@ class Trace:
 
 		if not found_start:
 			raise ValueError("Invalid trace string format!")
+
+		# update the root time to reflect its children, the raw trace excludes this time
+		#for ch in self.root.items:
+		#	self.root.time += ch.time
 	
 	def toString(self):
 		s = ""
