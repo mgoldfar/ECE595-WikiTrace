@@ -1,5 +1,6 @@
 import os, sys
 import memcache
+import zlib 
 
 class Trace:
 	
@@ -43,8 +44,29 @@ class Trace:
 			raise KeyError(memcache_key)
 		
 		self.loadFromString(tracestr)
+	
+	def _is_zlib_compressed(self, s):
+		if len(s) < 2:
+			return False
+			
+		cmf = ord(s[0])
+		if cmf & 0x0f != 0x08 and cmf & 0xf0 != 0x70:
+			return False
+		
+		flg = ord(s[1])
+		
+		if (cmf*256 + flg) % 31 != 0:
+			return False
+	
+		return True
+		
 			
 	def loadFromString(self, tracestr):
+		
+		# Check if the string is zlib compressed
+		if self._is_zlib_compressed(tracestr):
+			tracestr = zlib.decompress(tracestr)
+			
 		cur_level = 0
 		self.root = TraceItem("trace", None)
 		item_stack = [self.root]

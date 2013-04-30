@@ -28,6 +28,7 @@ for i in range(start, end+1):
 	traces.set(traceid, trace)
 	print trace.root.toString(2)
 	print "Loaded Trace %d" % (i,)
+	
 print "Total Execution Time = %f" % (traces.getAggergateTimeForNodes())
 print
 
