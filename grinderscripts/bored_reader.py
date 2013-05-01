@@ -14,60 +14,40 @@ import re
 import time
 import random
 
-test = Test(1, "Wiki Test")
+testName = grinder.properties.getProperty("ece595.testname")
+serverURL = grinder.properties.getProperty("ece595.url")
+baseID = int(grinder.properties.getProperty("ece595.baseid"))
+traceServer = grinder.properties.getProperty("ece595.traceserver")
+cacheType = grinder.properties.getProperty("ece595.cachetype")
+runs =  int(grinder.properties.getProperty("grinder.runs"))
 
-WRITE_PERCENTAGE = 0.1
-REQUEST_ID_PREFIX="BoredReaderTest"
+DEPTH = 5
+INITIAL_PAGE = "Ethernet"
 READER_OPEN = 0.3
 OPEN_AGAIN = 0.2
 
-# Media wiki will redirect if we don't use the RAW url, this makes the scripting easier
-serverURL = 'http://sdcranch10.ecn.purdue.edu'
-pageURL = serverURL + '/index.php/Collision_domain'
-URLsuffix = "?action=view&title=Test&RequestID=%s-%d"
-
-
+test = Test(1, testName)
 request = HTTPRequest()
 test.record(request)
 
-
-def removeduplicates(oldlist):
-  templist = list(set(oldlist))
-  
-      
-class TestRunner:
-  def __call__(self):
-    reducer = 1
-    import Wikiparser
-    getlinks = []
-    pagecontents = Wikiparser.getpage(pageURL)
-    links = Wikiparser.getlinks(pagecontents)
-    for l in links:
-      if random.random() < READER_OPEN:
-        print "Adding new link to open: " + l
-        getlinks.append(l)
-        result = request.GET(serverURL + l + URLsuffix % (REQUEST_ID_PREFIX, grinder.runNumber))
-        print result
-    getlinks = list(set(getlinks))
-    for l in getlinks:
-      print l
-    for l in getlinks:
-      print "Reader browsing..." + l
-      if random.random() < READER_OPEN:
-        print "Reader reading the new page" + l
-        newpage = Wikiparser.getpage(serverURL + l)
-        morelinks = Wikiparser.getlinks(newpage)
-        for l2 in morelinks:
-          print "Reader browsing more..." + l2
-          if random.random() < OPEN_AGAIN / reducer:
-            reducer = reducer + 1
-            print "Reader adding new link to open [again] : " + l2 + " " + str(getlinks.index(l)+1) + " out of " + str(len(getlinks))
-            getlinks.append(l2)
-            result = request.GET(serverURL + l2 + URLsuffix % (REQUEST_ID_PREFIX, grinder.runNumber))
-            #print result
-      else:
-        print "Reader not interested in page "  + l + " " + str(getlinks.index(l)+1) + " out of " + str(len(getlinks))
-      #getlinks.popleft()
-
+theurl = serverURL + "/index.php/%s?RequestID=%s-%d-%d&TraceServer=%s&CompressTrace=gzip&CacheType=%s"
     
-
+class TestRunner:
+	def __call__(self):
+		import Wikiparser
+		
+		traceIndex = baseID*runs + grinder.runNumber
+		cur_link = INITIAL_PAGE 
+		for i in range(DEPTH):
+			actual_url = theurl % (cur_link, testName, i, traceIndex, traceServer, cacheType)
+			print actual_url
+			
+			# the the lings from the page 
+			result = request.GET(actual_url)
+			links = Wikiparser.getlinks(result.getText().encode('utf-8'))
+			#print links 
+			
+			# pick a random link:
+			random.shuffle(links)
+			cur_link = random.choice(links).replace("/index.php/", "")
+			#print cur_link
