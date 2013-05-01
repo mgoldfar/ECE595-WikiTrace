@@ -22,6 +22,24 @@ class Trace:
 		with open(filename, "w") as f:
 			tracestr = self.toString()
 			f.write(tracestr)
+	
+	def deleteFromMemcache(self, memcache_key, memcache_server=None):
+		if not memcache_server:
+			self.memcache_server = "localhost:11211"
+		else:
+			# use default port if non given	
+			server_and_port = memcache_server.split(":", 1)
+			if len(server_and_port) == 1:
+				port = 11211
+			else:
+				port = int(server_and_port[1])
+			
+			self.memcache_server = "%s:%d" % (server_and_port[0], port)
+			
+		self.memcache_key = memcache_key
+		
+		mc = memcache.Client([self.memcache_server])
+		mc.delete(memcache_key)
 		
 	def loadFromMemcache(self, memcache_key, memcache_server=None):
 		if not memcache_server:

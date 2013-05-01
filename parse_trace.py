@@ -8,7 +8,7 @@ import StringIO
 import progressbar
 
 if len(sys.argv) <= 3:
-	sys.stderr.write("usage: parse_trace.py <trace id> <start> <end> [--trace_archive_dir=traces] [--trace_server=localhost] [--download_only]\n")
+	sys.stderr.write("usage: parse_trace.py <trace id> <start> <end> [--delete_only] [--trace_archive_dir=traces] [--trace_server=localhost] [--download_only]\n")
 	sys.exit(1)
 
 traceid_base = sys.argv[1]
@@ -17,6 +17,7 @@ end = int(sys.argv[3])
 
 print_summary = True
 load_from_trace_dir = False
+delete_traces = False
 trace_archive_dir="traces"
 trace_server = "localhost"
 
@@ -30,6 +31,10 @@ for arg in sys.argv[4:]:
 		
 	if arg.startswith("--download_only"):
 		print_summary = False
+		
+	if arg.startswith("--delete_only"):
+		print_summary = False
+		delete_traces = True
 
 if start < 0 or end < 0 or start > end:
 	sys.stderr.write("error: start must be less than or equal to end!\n")
@@ -63,6 +68,12 @@ linker_time = 0.0
 linker_db_stats = WikiTrace.DBTraceStats()
 linker_cache_stats = WikiTrace.CacheTraceStats()
 
+if delete_traces:
+	answer = raw_input("Really delete traces? ").trim()
+	if answer != "YES":
+		print "Aborting..."
+		sys.exit(1)
+		
 print "Processing traces..."
 progbar = progressbar.ProgressBar(maxval=end-start+1, widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()])
 
@@ -71,36 +82,40 @@ for i in range(start, end+1):
 	traceid = "%s-%d" % (sys.argv[1], i)
 	trace = WikiTrace.Trace()
 	
-	if not load_from_trace_dir:
-		trace.loadFromMemcache(traceid, trace_server)
-		trace.saveToFile(os.path.join(trace_archive_dir, traceid))
+	if delete_traces:
+		trace.deleteFromMemcache(traceid, trace_server)
+		continue
 	else:
-		trace.loadFromFile(os.path.join(trace_archive_dir, traceid))
+		if not load_from_trace_dir:
+			trace.loadFromMemcache(traceid, trace_server)
+			trace.saveToFile(os.path.join(trace_archive_dir, traceid))
+		else:
+			trace.loadFromFile(os.path.join(trace_archive_dir, traceid))
 
-	if print_summary:
+			if print_summary:
 
-		total_exec_time += trace.root.get_time()
-		total_db_stats.add(trace.root.get_database_stats())
+				total_exec_time += trace.root.get_time()
+				total_db_stats.add(trace.root.get_database_stats())
 
-		loc_cache_time += trace.root.get_time(["LocalisationCache::"])
-		loc_cache_db_stats.add(trace.root.get_database_stats(["LocalisationCache::"]))
-		loc_cache_cache_stats.add(trace.root.get_cache_stats(["LocalisationCache::"]))
+				loc_cache_time += trace.root.get_time(["LocalisationCache::"])
+				loc_cache_db_stats.add(trace.root.get_database_stats(["LocalisationCache::"]))
+				loc_cache_cache_stats.add(trace.root.get_cache_stats(["LocalisationCache::"]))
 	
-		parser_time += trace.root.get_time(["Parser::"])
-		parser_db_stats.add(trace.root.get_database_stats(["Parser::", "ParserCache::"]))
-		parser_cache_stats.add(trace.root.get_cache_stats(["ParserCache::get"]))
+				parser_time += trace.root.get_time(["Parser::"])
+				parser_db_stats.add(trace.root.get_database_stats(["Parser::", "ParserCache::"]))
+				parser_cache_stats.add(trace.root.get_cache_stats(["ParserCache::get"]))
 	
-		resldr_time += trace.root.get_time(["ResourceLoader::"])
-		resldr_db_stats.add(trace.root.get_database_stats(["ResourceLoader::"]))
-		resldr_cache_stats.add(trace.root.get_cache_stats(["ResourceLoader::"]))
+				resldr_time += trace.root.get_time(["ResourceLoader::"])
+				resldr_db_stats.add(trace.root.get_database_stats(["ResourceLoader::"]))
+				resldr_cache_stats.add(trace.root.get_cache_stats(["ResourceLoader::"]))
 	
-		rev_time += trace.root.get_time(["Revision::"])
-		rev_db_stats.add(trace.root.get_database_stats(["Revision::"]))
-		rev_cache_stats.add(trace.root.get_cache_stats(["Revision::"]))
+				rev_time += trace.root.get_time(["Revision::"])
+				rev_db_stats.add(trace.root.get_database_stats(["Revision::"]))
+				rev_cache_stats.add(trace.root.get_cache_stats(["Revision::"]))
 	
-		linker_time += trace.root.get_time(["Linker::", "LinkCache::"])
-		linker_db_stats.add(trace.root.get_database_stats(["Linker::", "LinkCache::"]))
-		linker_cache_stats.add(trace.root.get_cache_stats(["Linker::", "LinkCache::"]))
+				linker_time += trace.root.get_time(["Linker::", "LinkCache::"])
+				linker_db_stats.add(trace.root.get_database_stats(["Linker::", "LinkCache::"]))
+				linker_cache_stats.add(trace.root.get_cache_stats(["Linker::", "LinkCache::"]))
 	
 	#print "Processed trace %d" % (i,)
 	progbar.update(j)
