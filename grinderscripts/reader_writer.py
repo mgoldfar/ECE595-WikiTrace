@@ -62,7 +62,9 @@ class TestRunner:
 					
 					# This is for getting the edit form
 					requestID = "&RequestID=%s-%s-%s-%d-%d" % (testName, page_description[i], WRITEPCTS[j], 0, traceindex)
-					result = requests[i].GET(writeEditUrl + requestID)
+					u = writeEditUrl + requestID
+					print u
+					result = requests[i].GET(u)
 					
 					# this is the edit form submission:
 					edittime = time.strftime("%Y%m%d%H%M%S", time.localtime())
@@ -84,22 +86,32 @@ class TestRunner:
 					NVPair("wpSummary", editsummary), NVPair("wpSave", "Save Page"), NVPair("wpEditToken", "+\\"))
 					
 					requestID = "&RequestID=%s-%s-%s-%d-%d" % (testName, page_description[i], WRITEPCTS[j], 1, traceindex)
-					result = requests[i].POST(writeSubmitUrl + requestID, post_data)
+					u = writeSubmitUrl + requestID
+					print u
+					result = requests[i].POST(u, post_data)
 					
 					requestID = "&RequestID=%s-%s-%s-%d-%d" % (testName, page_description[i], WRITEPCTS[j], 2, traceindex)
-					result = requests[i].GET(readUrl + requestID)
+					u = readUrl + requestID
+					print u
+					result = requests[i].GET(u)
 			
 				else:
 					print "READ"
 					print readUrl
 					
 					requestID = "&RequestID=%s-%s-%s-%d-%d" % (testName, page_description[i], WRITEPCTS[j], 0, traceindex)
-					result = requests[i].GET(readUrl + requestID)
+					u = readUrl + requestID
+					print u
+					result = requests[i].GET(u)
 					
 					requestID = "&RequestID=%s-%s-%s-%d-%d" % (testName, page_description[i], WRITEPCTS[j], 1, traceindex)
+					u = readUrl + requestID
+					print u
 					result = requests[i].GET(readUrl + requestID)
 					
 					requestID = "&RequestID=%s-%s-%s-%d-%d" % (testName, page_description[i], WRITEPCTS[j], 2, traceindex)
+					u = readUrl + requestID
+					print u
 					result = requests[i].GET(readUrl + requestID)
 
 
