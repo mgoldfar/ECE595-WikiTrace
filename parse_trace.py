@@ -5,27 +5,31 @@ import WikiTrace
 		
 import gzip
 import StringIO
-import sys
+import progressbar
 
-if len(sys.argv) != 4 and len(sys.argv) != 5 :
-	sys.stderr.write("usage: parse_trace.py <trace id> <start> <end> [trace_archive_dir=traces]\n")
+if len(sys.argv) <= 3:
+	sys.stderr.write("usage: parse_trace.py <trace id> <start> <end> [--trace_archive_dir=traces] [--trace_server=localhost]\n")
 	sys.exit(1)
 
 traceid_base = sys.argv[1]
 start = int(sys.argv[2])
 end = int(sys.argv[3])
+
 load_from_trace_dir = False
 trace_archive_dir="traces"
+trace_server = "localhost"
 
-if len(sys.argv) == 5:
-	load_from_trace_dir = True
-	trace_archive_dir = sys.argv[4]
-
+for arg in sys.argv[4:]:
+	if arg.startswith("--trace_archive_dir="):
+		load_from_trace_dir = True
+		trace_archive_dir = arg.replace("--trace_archive_dir=", "", 1)
+	
+	if arg.startswith("--trace_server="):
+		trace_server = arg.replace("--trace_server=", "", 1)
 
 if start < 0 or end < 0 or start > end:
 	sys.stderr.write("error: start must be less than or equal to end!\n")
 	sys.exit(1)
-
 
 if not os.path.exists(trace_archive_dir):
 	os.mkdir(trace_archive_dir)
@@ -55,12 +59,16 @@ linker_time = 0.0
 linker_db_stats = WikiTrace.DBTraceStats()
 linker_cache_stats = WikiTrace.CacheTraceStats()
 
+print "Processing traces..."
+progbar = progressbar.ProgressBar(maxval=end-start+1, widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()])
+
+j=0
 for i in range(start, end+1):
 	traceid = "%s-%d" % (sys.argv[1], i)
 	trace = WikiTrace.Trace()
 	
 	if not load_from_trace_dir:
-		trace.loadFromMemcache(traceid)
+		trace.loadFromMemcache(traceid, trace_server)
 		trace.saveToFile(os.path.join(trace_archive_dir, traceid))
 	else:
 		trace.loadFromFile(os.path.join(trace_archive_dir, traceid))
@@ -88,12 +96,13 @@ for i in range(start, end+1):
 	linker_db_stats.add(trace.root.get_database_stats(["Linker::", "LinkCache::"]))
 	linker_cache_stats.add(trace.root.get_cache_stats(["Linker::", "LinkCache::"]))
 	
-	print "Processed trace %d" % (i,)
+	#print "Processed trace %d" % (i,)
+	progbar.update(j)
+	j+=1
 	
-	#traces.set(traceid, trace)
-	#print trace.root.toString(2)
-	
-	
+progbar.finish()	
+
+print
 print "Total Execution Time = %f" % (total_exec_time,)
 print
 

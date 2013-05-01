@@ -29,7 +29,7 @@ class Trace:
 		else:
 			# use default port if non given	
 			server_and_port = memcache_server.split(":", 1)
-			if len(srver_and_port) == 1:
+			if len(server_and_port) == 1:
 				port = 11211
 			else:
 				port = int(server_and_port[1])
