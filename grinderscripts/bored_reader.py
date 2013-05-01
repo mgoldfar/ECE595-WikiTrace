@@ -9,8 +9,6 @@ from net.grinder.script.Grinder import grinder
 from net.grinder.script import Test
 from net.grinder.plugin.http import HTTPRequest
 from HTTPClient import NVPair
-import Wikiparser
-import re
 import time
 import random
 
@@ -34,7 +32,8 @@ theurl = serverURL + "/index.php/%s?RequestID=%s-%d-%d&TraceServer=%s&CompressTr
     
 class TestRunner:
 	def __call__(self):
-		import re		
+		import re
+		import Wikiparser		
 		traceIndex = baseID*runs + grinder.runNumber
 		cur_link = INITIAL_PAGE 
 		for i in range(DEPTH):
