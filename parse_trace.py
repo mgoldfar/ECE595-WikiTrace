@@ -1,6 +1,6 @@
 #! /usr/bin/env python2.6
 
-import os, sys
+import os, sys, glob
 import WikiTrace
 		
 import gzip
@@ -8,7 +8,7 @@ import StringIO
 import progressbar
 
 if len(sys.argv) <= 3:
-	sys.stderr.write("usage: parse_trace.py <trace id> <start> <end> [--delete_only] [--trace_archive_dir=traces] [--trace_server=localhost] [--download_only]\n")
+	sys.stderr.write("usage: parse_trace.py <trace id> <start> <end> [--delete_only] [--trace_archive_dir=traces] [--trace_server=localhost] [--download_only] [--trace_id_is_glob]\n")
 	sys.exit(1)
 
 traceid_base = sys.argv[1]
@@ -18,6 +18,7 @@ end = int(sys.argv[3])
 print_summary = True
 load_from_trace_dir = False
 delete_traces = False
+trace_id_is_glob = False
 trace_archive_dir="traces"
 trace_server = "localhost"
 
@@ -35,10 +36,24 @@ for arg in sys.argv[4:]:
 	if arg.startswith("--delete_only"):
 		print_summary = False
 		delete_traces = True
+		
+	if arg.startswith("--trace_id_is_glob"):
+		trace_id_is_glob = True
 
 if start < 0 or end < 0 or start > end:
 	sys.stderr.write("error: start must be less than or equal to end!\n")
 	sys.exit(1)
+
+if not load_from_trace_dir and trace_id_is_glob:
+	sys.stderr.write("error: memcached does not support globs!\n")
+	sys.exit(1)
+
+
+if delete_traces:
+	answer = raw_input("Really delete traces? ").trim()
+	if answer != "YES":
+		print "Aborting..."
+		sys.exit(1)
 
 if not os.path.exists(trace_archive_dir):
 	os.mkdir(trace_archive_dir)
@@ -68,11 +83,31 @@ linker_time = 0.0
 linker_db_stats = WikiTrace.DBTraceStats()
 linker_cache_stats = WikiTrace.CacheTraceStats()
 
-if delete_traces:
-	answer = raw_input("Really delete traces? ").trim()
-	if answer != "YES":
-		print "Aborting..."
-		sys.exit(1)
+
+def process_trace(trace):
+	global total_exec_time, total_db_stats, loc_cache_time, loc_cache_db_stats, loc_cache_cache_stats, parser_time, parser_db_stats, parser_cache_stats, resldr_time, resldr_db_stats, resldr_cache_sats, rev_time, rev_db_stats, rev_cache_stats, linker_time, linker_db_stats, linker_cache_stats
+	total_exec_time += trace.root.get_time()
+	total_db_stats.add(trace.root.get_database_stats())
+	
+	loc_cache_time += trace.root.get_time(["LocalisationCache::"])
+	loc_cache_db_stats.add(trace.root.get_database_stats(["LocalisationCache::"]))
+	loc_cache_cache_stats.add(trace.root.get_cache_stats(["LocalisationCache::"]))
+        
+	parser_time += trace.root.get_time(["Parser::"])
+	parser_db_stats.add(trace.root.get_database_stats(["Parser::", "ParserCache::"]))
+	parser_cache_stats.add(trace.root.get_cache_stats(["ParserCache::get"]))
+        
+	resldr_time += trace.root.get_time(["ResourceLoader::"])
+	resldr_db_stats.add(trace.root.get_database_stats(["ResourceLoader::"]))
+	resldr_cache_stats.add(trace.root.get_cache_stats(["ResourceLoader::"]))
+        
+	rev_time += trace.root.get_time(["Revision::"])
+	rev_db_stats.add(trace.root.get_database_stats(["Revision::"]))
+	rev_cache_stats.add(trace.root.get_cache_stats(["Revision::"]))
+        
+	linker_time += trace.root.get_time(["Linker::", "LinkCache::"])
+	linker_db_stats.add(trace.root.get_database_stats(["Linker::", "LinkCache::"]))
+	linker_cache_stats.add(trace.root.get_cache_stats(["Linker::", "LinkCache::"]))
 		
 print "Processing traces..."
 progbar = progressbar.ProgressBar(maxval=end-start+1, widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()])
@@ -80,12 +115,21 @@ progbar = progressbar.ProgressBar(maxval=end-start+1, widgets=[progressbar.Bar('
 j=0
 for i in range(start, end+1):
 	traceid = "%s-%d" % (sys.argv[1], i)
-	trace = WikiTrace.Trace()
 	
-	if delete_traces:
+	if trace_id_is_glob:
+		# multiple trace files that match the globs...                                                                                                                                   
+		for tracefile in glob.glob(os.path.join(trace_archive_dir, traceid)):
+			trace = WikiTrace.Trace()
+			trace.loadFromFile(tracefile)
+			if print_summary:
+				process_trace(trace)
+				
+	elif delete_traces:
+		trace = WikiTrace.Trace()
 		trace.deleteFromMemcache(traceid, trace_server)
 		continue
 	else:
+		trace = WikiTrace.Trace()
 		if not load_from_trace_dir:
 			trace.loadFromMemcache(traceid, trace_server)
 			trace.saveToFile(os.path.join(trace_archive_dir, traceid))
@@ -93,30 +137,8 @@ for i in range(start, end+1):
 			trace.loadFromFile(os.path.join(trace_archive_dir, traceid))
 
 			if print_summary:
+				process_trace(trace)
 
-				total_exec_time += trace.root.get_time()
-				total_db_stats.add(trace.root.get_database_stats())
-
-				loc_cache_time += trace.root.get_time(["LocalisationCache::"])
-				loc_cache_db_stats.add(trace.root.get_database_stats(["LocalisationCache::"]))
-				loc_cache_cache_stats.add(trace.root.get_cache_stats(["LocalisationCache::"]))
-	
-				parser_time += trace.root.get_time(["Parser::"])
-				parser_db_stats.add(trace.root.get_database_stats(["Parser::", "ParserCache::"]))
-				parser_cache_stats.add(trace.root.get_cache_stats(["ParserCache::get"]))
-	
-				resldr_time += trace.root.get_time(["ResourceLoader::"])
-				resldr_db_stats.add(trace.root.get_database_stats(["ResourceLoader::"]))
-				resldr_cache_stats.add(trace.root.get_cache_stats(["ResourceLoader::"]))
-	
-				rev_time += trace.root.get_time(["Revision::"])
-				rev_db_stats.add(trace.root.get_database_stats(["Revision::"]))
-				rev_cache_stats.add(trace.root.get_cache_stats(["Revision::"]))
-	
-				linker_time += trace.root.get_time(["Linker::", "LinkCache::"])
-				linker_db_stats.add(trace.root.get_database_stats(["Linker::", "LinkCache::"]))
-				linker_cache_stats.add(trace.root.get_cache_stats(["Linker::", "LinkCache::"]))
-	
 	#print "Processed trace %d" % (i,)
 	progbar.update(j)
 	j+=1
