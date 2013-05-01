@@ -18,6 +18,7 @@ GRINDER_SCRIPT_DIR=wiki_trace/grinderscripts
 TRACE_SERVER_USER=office
 TRACE_SERVER_HOST=128.46.214.190
 TRACE_SERVER_MEM=512
+TRACE_SERVER_SLAB_SIZE=4194304
 
 NUMHOSTS=$1
 TESTNAME=$2
@@ -40,7 +41,7 @@ memcache_pid=$(ssh -o StrictHostKeyChecking=no $TRACE_SERVER_USER@$TRACE_SERVER_
 if [[ -z $memcache_pid ]]
 then
 		echo "Starting memcached on $TRACE_SERVER_HOST..."
-		CMDSTR="nohup memcached -m $TRACE_SERVER_MEM > memcached.out 2> memcached.err < /dev/null &"
+		CMDSTR="nohup memcached -m $TRACE_SERVER_MEM -I $TRACE_SERVER_SLAB_SIZE > memcached.out 2> memcached.err < /dev/null &"
 		ssh -o StrictHostKeyChecking=no $TRACE_SERVER_USER@$TRACE_SERVER_HOST $CMDSTR		
 else
 		echo "memcached is running on $TRACE_SERVER_HOST with PID $memcache_pid"
@@ -73,10 +74,12 @@ do
 done
 
 # Download the traces from the trace cache
-cd $WORKDIR
-set -x
-(( NTRACES=NRUNS*NUMHOSTS - 1 ))
-../../parse_trace.py $TESTNAME 0 $NTRACES --trace_server=$TRACE_SERVER_HOST
-cd ..
+#cd $WORKDIR
+#( NTRACES=NRUNS*NUMHOSTS - 1 ))
+#for size in small average large
+#do
+#	../../parse_trace.py $TESTNAME-$size 0 $NTRACES --trace_server=$TRACE_SERVER_HOST --download_only;
+#done
+#cd ..
 
 exit 0
