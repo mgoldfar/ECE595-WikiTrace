@@ -12,13 +12,16 @@ def getpage(URL):
   return html
 
 def getlinks(page):
+  import re
   filter1 = re.findall('<a href="?\'?([^"\'>]*)', page)
   links = []
   for i in filter1:
     m = re.match('/index.php/', i)
     n = re.search(':', i)
-    if(m and not(n)):
+    p = re.search("readlink", i)
+    if(m and not n and not p):
       links.append(i)
+
   return links
         
 def trim_html(page):
