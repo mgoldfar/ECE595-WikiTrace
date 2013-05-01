@@ -7,6 +7,14 @@ import re
 import time
 import random
 
+# average page len = 726689
+# 
+
+# small, avg, large
+page_description = ["small", "average", "large"]
+pages = ["1829_in_sports", "Computer_accessibility", "Ethernet"]
+requests = []
+
 testName = grinder.properties.getProperty("ece595.testname")
 serverURL = grinder.properties.getProperty("ece595.url")
 baseID = int(grinder.properties.getProperty("ece595.baseid"))
@@ -14,15 +22,17 @@ traceServer = grinder.properties.getProperty("ece595.traceserver")
 cacheType = grinder.properties.getProperty("ece595.cachetype")
 runs =  int(grinder.properties.getProperty("grinder.runs"))
 
-test = Test(1, testName)
-request = HTTPRequest()
-test.record(request)
+for i in range(len(pages)):
+	test = Test(i+1, "%s-%s" % (page_description[i], testName))
+	request = HTTPRequest()
+	requests.append(request)
+	test.record(request)
 
 class TestRunner:
   def __call__(self):
-	traceindex = baseID*runs + grinder.runNumber
-	theurl = serverURL + "/index.php/Ethernet?RequestID=%s-%d&TraceServer=%s&CompressTrace=gzip&CacheType=%s" % (testName, traceindex, traceServer, cacheType)
-	
-	print "Making request to %s" % (theurl, )
-	result = request.GET(theurl)
-	print result
+	for i in len(pages):	
+		traceindex = baseID*runs + grinder.runNumber
+		theurl = serverURL + "/index.php/%s?RequestID=%s-%s-%d&TraceServer=%s&CompressTrace=gzip&CacheType=%s" % (pages[i], testName, page_description[i], traceindex, traceServer, cacheType)
+		print "%s" % (theurl, )
+		result = requests[i].GET(theurl)
+
