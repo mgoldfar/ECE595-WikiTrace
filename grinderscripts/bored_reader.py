@@ -33,7 +33,8 @@ test.record(request)
 theurl = serverURL + "/index.php/%s?RequestID=%s-%d-%d&TraceServer=%s&CompressTrace=gzip&CacheType=%s"
     
 class TestRunner:
-	def __call__(self):		
+	def __call__(self):
+		import re		
 		traceIndex = baseID*runs + grinder.runNumber
 		cur_link = INITIAL_PAGE 
 		for i in range(DEPTH):
