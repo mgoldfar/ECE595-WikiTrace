@@ -26,7 +26,7 @@ traceServer = grinder.properties.getProperty("ece595.traceserver")
 cacheType = grinder.properties.getProperty("ece595.cachetype")
 runs =  int(grinder.properties.getProperty("grinder.runs"))
 
-WRITEPCTS = [100, 100] #[10, 25]
+WRITEPCTS = [10, 25]
 
 # get the raw wiki text (avoid having to parse html output during the test)
 for i in range(len(pages)):
