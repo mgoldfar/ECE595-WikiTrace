@@ -30,7 +30,7 @@ for i in range(len(pages)):
 
 class TestRunner:
   def __call__(self):
-	for i in len(pages):	
+	for i in range(len(pages)):	
 		traceindex = baseID*runs + grinder.runNumber
 		theurl = serverURL + "/index.php/%s?RequestID=%s-%s-%d&TraceServer=%s&CompressTrace=gzip&CacheType=%s" % (pages[i], testName, page_description[i], traceindex, traceServer, cacheType)
 		print "%s" % (theurl, )
