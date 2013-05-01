@@ -40,6 +40,7 @@ class TestRunner:
 			
 			urlParams = "TraceServer=%s&CompressTrace=gzip&CacheType=%s"% (traceServer, cacheType)				
 			writeSubmitUrl = serverURL + "/index.php?action=submit&title=%s&%s" % (pages[i], urlParams)
+			requestID = "&RequestID=%s-%s-%d" % (testName, page_description[i], traceindex)
 
 			print "WRITE"
 			
@@ -61,8 +62,7 @@ class TestRunner:
 			post_data = ( NVPair("wpSection", ""), NVPair("wpStarttime", "0"), NVPair("wpEdittime", edittime),
 				      NVPair("wpScrolltop", "0"), NVPair("wpAutoSummary", "0"), NVPair("oldid", "0"), NVPair("wpTextbox1", text),
 				      NVPair("wpSummary", editsummary), NVPair("wpSave", "Save Page"), NVPair("wpEditToken", "+\\"))
-					
-			requestID = "&RequestID=%s-%s-%d" % (testName, page_description[i], traceindex)
+								
 			u = writeSubmitUrl + requestID
 			print u
 			result = requests[i].POST(u, post_data)
