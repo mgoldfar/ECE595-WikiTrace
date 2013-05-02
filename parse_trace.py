@@ -136,8 +136,8 @@ for i in range(start, end+1):
 		else:
 			trace.loadFromFile(os.path.join(trace_archive_dir, traceid))
 
-			if print_summary:
-				process_trace(trace)
+		if print_summary:
+			process_trace(trace)
 
 	#print "Processed trace %d" % (i,)
 	progbar.update(j)
