@@ -20,10 +20,13 @@ traceServer = grinder.properties.getProperty("ece595.traceserver")
 cacheType = grinder.properties.getProperty("ece595.cachetype")
 runs =  int(grinder.properties.getProperty("grinder.runs"))
 
+def removeNonAscii(s): 
+	return "".join(i for i in s if ord(i)<128)
+
 # get the raw wiki text (avoid having to parse html output during the test)
 for i in range(len(pages)):
-	s = Wikiparser.get_page(pages[i], serverURL.replace("http://", "", 1))
-	wiki_text.append(s.encode('utf-8'))
+	s = removeNonAscii(Wikiparser.get_page(pages[i], serverURL.replace("http://", "", 1)))
+	wiki_text.append(s)
 	print "Page %d size is %d" % (i, len(s))
 	#print s
 
@@ -49,7 +52,7 @@ class TestRunner:
 			editsummary = "Edited by grinder test %s at %s" % (requestID.replace("&RequestID=",""), edittime)
 			
 			editheader = "= %s =\n" % (editsummary,)
-			editheader = editheader.encode('utf-8')
+			#editheader = editheader.encode('utf-8')
 			
 			import re
 			m = re.match(r"= Edited by grinder test .*? at .*? =", wiki_text[i])
